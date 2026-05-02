@@ -74,17 +74,83 @@ function parseCsv(text) {
     .filter((r) => r.close > 0);
 }
 
-async function fetchCsvWithFallback(url) {
-  try {
-    const direct = await fetch(url);
-    if (direct.ok) return await direct.text();
-  } catch (_) {}
+function parseYahooChart(json) {
+  const result = json?.chart?.result?.[0];
+  const timestamps = result?.timestamp || [];
+  const q = result?.indicators?.quote?.[0] || {};
+  const closes = q.close || [];
+  const opens = q.open || [];
+  const highs = q.high || [];
+  const lows = q.low || [];
+  const volumes = q.volume || [];
 
-  const proxied = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
-  if (!proxied.ok) {
-    throw new Error('Could not fetch market data right now. Try again in a moment.');
+  const rows = [];
+  for (let i = 0; i < timestamps.length; i += 1) {
+    const close = safeNum(closes[i], NaN);
+    if (!Number.isFinite(close) || close <= 0) continue;
+    rows.push({
+      date: new Date(timestamps[i] * 1000).toISOString().slice(0, 10),
+      open: safeNum(opens[i]),
+      high: safeNum(highs[i]),
+      low: safeNum(lows[i]),
+      close,
+      volume: safeNum(volumes[i]),
+    });
   }
-  return await proxied.text();
+  return rows;
+}
+
+async function tryFetchText(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.text();
+}
+
+async function tryFetchJson(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+async function fetchRowsWithFallback(ticker) {
+  const stooqSymbol = `${ticker.toLowerCase()}.us`;
+  const stooqUrl = `https://stooq.com/q/d/l/?s=${stooqSymbol}&i=d`;
+  const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=1y&interval=1d`;
+
+  const textAttempts = [
+    stooqUrl,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(stooqUrl)}`,
+    `https://cors.isomorphic-git.org/${stooqUrl}`,
+    `https://r.jina.ai/http://stooq.com/q/d/l/?s=${stooqSymbol}&i=d`,
+  ];
+
+  for (const attempt of textAttempts) {
+    try {
+      const text = await tryFetchText(attempt);
+      const rows = parseCsv(text);
+      if (rows.length >= 60) return rows;
+    } catch (_) {
+      // Continue fallback chain.
+    }
+  }
+
+  const jsonAttempts = [
+    yahooUrl,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`,
+    `https://cors.isomorphic-git.org/${yahooUrl}`,
+  ];
+
+  for (const attempt of jsonAttempts) {
+    try {
+      const data = await tryFetchJson(attempt);
+      const rows = parseYahooChart(data);
+      if (rows.length >= 60) return rows;
+    } catch (_) {
+      // Continue fallback chain.
+    }
+  }
+
+  throw new Error('Could not fetch market data right now. Please try a different ticker or try again shortly.');
 }
 
 function computeMetrics(rows) {
@@ -166,10 +232,7 @@ async function runCheck() {
   btn.textContent = 'Checking...';
 
   try {
-    const symbol = `${ticker.toLowerCase()}.us`;
-    const url = `https://stooq.com/q/d/l/?s=${symbol}&i=d`;
-    const csvText = await fetchCsvWithFallback(url);
-    const rows = parseCsv(csvText);
+    const rows = await fetchRowsWithFallback(ticker);
     const m = computeMetrics(rows);
 
     verdictEl.textContent = `${ticker}: ${m.verdict} (${m.score}/${m.maxScore})`;
