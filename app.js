@@ -74,6 +74,21 @@ function parseCsv(text) {
     .filter((r) => r.close > 0);
 }
 
+function parseCsvLenient(text) {
+  const normalized = String(text || '')
+    .replace(/\r/g, '')
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (normalized.length < 3) return [];
+  const lines = normalized.map((line) => line.replace(/;+/g, ','));
+  try {
+    return parseCsv(lines.join('\n'));
+  } catch (_) {
+    return [];
+  }
+}
+
 function parseYahooChart(json) {
   const result = json?.chart?.result?.[0];
   const timestamps = result?.timestamp || [];
@@ -113,21 +128,33 @@ async function tryFetchJson(url) {
 }
 
 async function fetchRowsWithFallback(ticker) {
-  const stooqSymbol = `${ticker.toLowerCase()}.us`;
-  const stooqUrl = `https://stooq.com/q/d/l/?s=${stooqSymbol}&i=d`;
+  const t = ticker.toLowerCase();
+  const stooqSymbols = [
+    `${t}.us`,
+    t,
+  ];
   const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=1y&interval=1d`;
 
-  const textAttempts = [
-    stooqUrl,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(stooqUrl)}`,
-    `https://cors.isomorphic-git.org/${stooqUrl}`,
-    `https://r.jina.ai/http://stooq.com/q/d/l/?s=${stooqSymbol}&i=d`,
-  ];
+  const textAttempts = [];
+  for (const sym of stooqSymbols) {
+    const stooqUrl = `https://stooq.com/q/d/l/?s=${sym}&i=d`;
+    textAttempts.push(
+      stooqUrl,
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(stooqUrl)}`,
+      `https://cors.isomorphic-git.org/${stooqUrl}`,
+      `https://r.jina.ai/http://stooq.com/q/d/l/?s=${sym}&i=d`,
+    );
+  }
 
   for (const attempt of textAttempts) {
     try {
       const text = await tryFetchText(attempt);
-      const rows = parseCsv(text);
+      let rows = [];
+      try {
+        rows = parseCsv(text);
+      } catch (_) {
+        rows = parseCsvLenient(text);
+      }
       if (rows.length >= 60) return rows;
     } catch (_) {
       // Continue fallback chain.
