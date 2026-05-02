@@ -1,24 +1,27 @@
-# Clawbot Free Tier Web App
+# AI Stock Picker (Static GitHub Pages)
 
-Standalone public-facing web app for free-tier stock checks.
+Pure static version of the free-tier stock checker.
 
-## What it does
-- User enters a ticker (example: `AAPL`)
-- App reads local cached bars from `../market_cache/daily/<TICKER>.csv`
-- App returns current metrics + simple verdict (`GOOD PICK`, `WATCHLIST`, `HIGH RISK`)
+## How it works
+- Runs fully in the user's browser (client-side JavaScript)
+- Fetches daily price data from a public CSV endpoint
+- Computes metrics locally: SMA20/50, RSI14, 5D/20D returns, volatility, volume ratio
+- Produces a quick verdict: `GOOD PICK`, `WATCHLIST`, or `HIGH RISK`
 
-## Run
+## Local preview
+Open `index.html` directly, or run any static server.
 
-```bash
-cd clawbot_web_free
-pip install -r requirements.txt
-python app.py
-```
+## Publish on GitHub Pages
+1. Push this repo to GitHub.
+2. In GitHub repo settings: `Pages`.
+3. Source: `Deploy from a branch`.
+4. Branch: `main`, folder: `/ (root)`.
+5. Save.
 
-Open:
-- `http://127.0.0.1:8080`
+Your site will publish at:
+- `https://<username>.github.io/<repo>/`
 
 ## Notes
-- This free tier uses local cache data only.
-- If a ticker file is missing from `market_cache/daily`, the app returns a friendly error.
-- Your existing `clawbot_dash.py` is untouched.
+- No backend required.
+- Market-data endpoints can rate-limit under heavy traffic.
+- For paid/pro features, use a backend for auth, billing, and protected picks.

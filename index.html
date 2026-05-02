@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Stock Picker - Free Check</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="wrap">
+    <section class="panel">
+      <h1>AI Stock Picker</h1>
+      <p class="subtitle">Free Tier: enter a ticker and get current metrics plus a quick verdict.</p>
+
+      <div class="row">
+        <input id="ticker" type="text" placeholder="AAPL" maxlength="12" />
+        <button id="checkBtn" type="button">Check Ticker</button>
+      </div>
+
+      <p id="status" class="status"></p>
+
+      <div id="result" class="hidden">
+        <div class="verdictRow">
+          <h2 id="verdict"></h2>
+          <span id="asof"></span>
+        </div>
+
+        <div id="metrics" class="grid"></div>
+
+        <h3>Why</h3>
+        <ul id="reasons"></ul>
+      </div>
+
+      <p class="fineprint">Data source: public market CSV endpoint. For informational use only, not financial advice.</p>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>
