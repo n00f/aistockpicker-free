@@ -6,6 +6,10 @@ const verdictEl = document.getElementById('verdict');
 const asofEl = document.getElementById('asof');
 const metricsEl = document.getElementById('metrics');
 const reasonsEl = document.getElementById('reasons');
+const markersEl = document.getElementById('indicator-markers');
+
+let priceChart = null;
+let rsiChart = null;
 
 function safeNum(v, d = 0) {
   const n = Number(v);
@@ -56,6 +60,40 @@ function rsi14(values) {
   if (avgLoss === 0) return 100;
   const rs = avgGain / avgLoss;
   return 100 - (100 / (1 + rs));
+}
+
+function smaSeries(values, period) {
+  const out = [];
+  for (let i = 0; i < values.length; i += 1) {
+    if (i + 1 < period) out.push(null);
+    else {
+      let sum = 0;
+      for (let j = i + 1 - period; j <= i; j += 1) sum += values[j];
+      out.push(sum / period);
+    }
+  }
+  return out;
+}
+
+function rsiSeries(values, period = 14) {
+  const out = new Array(values.length).fill(null);
+  for (let i = period; i < values.length; i += 1) {
+    let gains = 0;
+    let losses = 0;
+    for (let j = i - period + 1; j <= i; j += 1) {
+      const change = values[j] - values[j - 1];
+      if (change >= 0) gains += change;
+      else losses += Math.abs(change);
+    }
+    const avgGain = gains / period;
+    const avgLoss = losses / period;
+    if (avgLoss === 0) out[i] = 100;
+    else {
+      const rs = avgGain / avgLoss;
+      out[i] = 100 - (100 / (1 + rs));
+    }
+  }
+  return out;
 }
 
 function parseCsv(text) {
@@ -196,14 +234,15 @@ function computeMetrics(rows) {
   const volAvg20 = sma(vols, 20);
   const volRatio = volAvg20 ? (last.volume / volAvg20) : null;
 
-  let score = 0;
-  const reasons = [];
-
-  if (price > s20) { score += 1; reasons.push('Price is above 20-day trend'); }
-  if (s20 > s50) { score += 1; reasons.push('Short trend is above medium trend'); }
-  if (r20 > 0) { score += 1; reasons.push('20-day momentum is positive'); }
-  if (rsi >= 45 && rsi <= 70) { score += 1; reasons.push('RSI is in a constructive range'); }
-  if (vol20 < 0.45) { score += 1; reasons.push('Volatility is moderate'); }
+  const checks = [
+    { name: 'Price > SMA20', pass: price > s20, reason: 'Price is above 20-day trend' },
+    { name: 'SMA20 > SMA50', pass: s20 > s50, reason: 'Short trend is above medium trend' },
+    { name: '20D Return > 0', pass: r20 > 0, reason: '20-day momentum is positive' },
+    { name: 'RSI in 45-70', pass: rsi >= 45 && rsi <= 70, reason: 'RSI is in a constructive range' },
+    { name: 'Volatility < 0.45', pass: vol20 < 0.45, reason: 'Volatility is moderate' },
+  ];
+  const score = checks.filter((c) => c.pass).length;
+  const reasons = checks.filter((c) => c.pass).map((c) => c.reason);
 
   let verdict = 'HIGH RISK';
   let verdictColor = '#dc2626';
@@ -230,6 +269,7 @@ function computeMetrics(rows) {
     verdict,
     verdictColor,
     reasons,
+    checks,
   };
 }
 
@@ -243,6 +283,70 @@ function metricCard(label, value) {
 function fmt(n, digits = 2) {
   if (!Number.isFinite(n)) return '-';
   return n.toFixed(digits);
+}
+
+function renderIndicatorMarkers(checks) {
+  markersEl.innerHTML = '';
+  checks.forEach((c) => {
+    const div = document.createElement('div');
+    div.className = `marker ${c.pass ? 'pass' : 'fail'}`;
+    div.textContent = `${c.pass ? 'PASS' : 'FAIL'}: ${c.name}`;
+    markersEl.appendChild(div);
+  });
+}
+
+function renderCharts(rows) {
+  if (typeof Chart === 'undefined') return;
+  const labels = rows.map((r) => r.date);
+  const closes = rows.map((r) => r.close);
+  const s20 = smaSeries(closes, 20);
+  const s50 = smaSeries(closes, 50);
+  const rsi = rsiSeries(closes, 14);
+
+  if (priceChart) priceChart.destroy();
+  if (rsiChart) rsiChart.destroy();
+
+  priceChart = new Chart(document.getElementById('priceChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Close', data: closes, borderColor: '#38bdf8', pointRadius: 0, tension: 0.15 },
+        { label: 'SMA20', data: s20, borderColor: '#22c55e', pointRadius: 0, tension: 0.15 },
+        { label: 'SMA50', data: s50, borderColor: '#f59e0b', pointRadius: 0, tension: 0.15 },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: { legend: { labels: { color: '#dbe4f0' } } },
+      scales: {
+        x: { ticks: { color: '#9fb0c9', maxTicksLimit: 8 }, grid: { color: '#223147' } },
+        y: { ticks: { color: '#9fb0c9' }, grid: { color: '#223147' } },
+      },
+    },
+  });
+
+  rsiChart = new Chart(document.getElementById('rsiChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'RSI14', data: rsi, borderColor: '#a78bfa', pointRadius: 0, tension: 0.12 },
+        { label: 'Overbought 70', data: new Array(labels.length).fill(70), borderColor: '#ef4444', pointRadius: 0, borderDash: [6, 6] },
+        { label: 'Oversold 30', data: new Array(labels.length).fill(30), borderColor: '#22c55e', pointRadius: 0, borderDash: [6, 6] },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: { legend: { labels: { color: '#dbe4f0' } } },
+      scales: {
+        x: { ticks: { color: '#9fb0c9', maxTicksLimit: 8 }, grid: { color: '#223147' } },
+        y: { min: 0, max: 100, ticks: { color: '#9fb0c9' }, grid: { color: '#223147' } },
+      },
+    },
+  });
 }
 
 async function runCheck() {
@@ -275,6 +379,8 @@ async function runCheck() {
     metricsEl.appendChild(metricCard('RSI 14', `${fmt(m.rsi14, 2)}`));
     metricsEl.appendChild(metricCard('Volatility (20D ann.)', `${fmt(m.vol20Annualized, 3)}`));
     metricsEl.appendChild(metricCard('Volume vs 20D avg', `${fmt(m.volumeVs20d, 2)}x`));
+    renderIndicatorMarkers(m.checks);
+    renderCharts(rows);
 
     reasonsEl.innerHTML = '';
     m.reasons.forEach((r) => {

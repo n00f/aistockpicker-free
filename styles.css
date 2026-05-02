@@ -110,5 +110,55 @@ li { margin: 4px 0; }
   color: #d6deea;
 }
 
+.markers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 14px;
+}
+
+.marker {
+  padding: 7px 10px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  border: 1px solid var(--line);
+}
+
+.marker.pass {
+  background: #052e1f;
+  color: #86efac;
+  border-color: #14532d;
+}
+
+.marker.fail {
+  background: #3b0a0a;
+  color: #fca5a5;
+  border-color: #7f1d1d;
+}
+
+.charts {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.chartCard {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  background: #0a1528;
+}
+
+.chartCard h3 {
+  margin: 0 0 8px;
+}
+
+@media (min-width: 900px) {
+  .charts {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 .fineprint { color: var(--muted); font-size: 0.84rem; margin-top: 16px; }
 .credit { color: #a5b4cf; font-size: 0.84rem; margin-top: 6px; }
