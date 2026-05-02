@@ -96,4 +96,19 @@ button:disabled { opacity: 0.7; cursor: default; }
 ul { margin: 0; padding-left: 18px; }
 li { margin: 4px 0; }
 
+.guide {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.guide h3 {
+  margin: 0 0 8px;
+}
+
+.guide ul li {
+  color: #d6deea;
+}
+
 .fineprint { color: var(--muted); font-size: 0.84rem; margin-top: 16px; }
+.credit { color: #a5b4cf; font-size: 0.84rem; margin-top: 6px; }

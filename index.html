@@ -31,7 +31,25 @@
         <ul id="reasons"></ul>
       </div>
 
+      <section class="guide">
+        <h3>Indicator Guide</h3>
+        <ul>
+          <li><strong>Price</strong>: Latest closing price for the stock.</li>
+          <li><strong>5D Change</strong>: Percent change over the last 5 trading days. Positive means short-term momentum is up.</li>
+          <li><strong>20D Change</strong>: Percent change over the last 20 trading days. Positive is usually a healthier trend signal.</li>
+          <li><strong>SMA 20</strong>: 20-day simple moving average. If price is above this, short-term trend is generally stronger.</li>
+          <li><strong>SMA 50</strong>: 50-day simple moving average. Used to judge medium-term trend direction.</li>
+          <li><strong>RSI 14</strong>: Momentum oscillator from 0 to 100. Very high can mean overbought; very low can mean oversold.</li>
+          <li><strong>Volatility (20D ann.)</strong>: How much price tends to swing, annualized from the last 20 days. Lower is usually less risky.</li>
+          <li><strong>Volume vs 20D avg</strong>: Today’s volume divided by 20-day average volume. Above 1.0x means heavier-than-usual trading activity.</li>
+          <li><strong>Score (x/5)</strong>: Rule-based strength score from five checks:
+            price above SMA20, SMA20 above SMA50, positive 20D return, RSI in a constructive range, and moderate volatility.</li>
+          <li><strong>Verdict</strong>: 4-5 = <strong>GOOD PICK</strong>, 3 = <strong>WATCHLIST</strong>, 0-2 = <strong>HIGH RISK</strong>.</li>
+        </ul>
+      </section>
+
       <p class="fineprint">Data source: public market CSV endpoint. For informational use only, not financial advice.</p>
+      <p class="credit">Authored by KDeg</p>
     </section>
   </main>
 
