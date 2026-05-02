@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Clawbot Free Tier</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <main class="wrap">
+    <section class="panel">
+      <h1>Clawbot Free Tier</h1>
+      <p class="subtitle">Enter a ticker to see current metrics and a quick pick verdict.</p>
+
+      <div class="row">
+        <input id="ticker" type="text" placeholder="AAPL" maxlength="12" />
+        <button id="checkBtn">Check Ticker</button>
+      </div>
+
+      <p id="status" class="status"></p>
+
+      <div id="result" class="hidden">
+        <div class="verdictRow">
+          <h2 id="verdict"></h2>
+          <span id="asof"></span>
+        </div>
+
+        <div id="metrics" class="grid"></div>
+
+        <h3>Why</h3>
+        <ul id="reasons"></ul>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const btn = document.getElementById('checkBtn');
+    const tickerInput = document.getElementById('ticker');
+    const statusEl = document.getElementById('status');
+    const resultEl = document.getElementById('result');
+    const verdictEl = document.getElementById('verdict');
+    const asofEl = document.getElementById('asof');
+    const metricsEl = document.getElementById('metrics');
+    const reasonsEl = document.getElementById('reasons');
+
+    function metricCard(label, value) {
+      const div = document.createElement('div');
+      div.className = 'card';
+      div.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div>`;
+      return div;
+    }
+
+    async function runCheck() {
+      const ticker = tickerInput.value.trim().toUpperCase();
+      statusEl.textContent = '';
+      resultEl.classList.add('hidden');
+
+      if (!ticker) {
+        statusEl.textContent = 'Please enter a ticker.';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Checking...';
+
+      try {
+        const res = await fetch('/api/free-check', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ticker})
+        });
+        const data = await res.json();
+
+        if (!res.ok || !data.ok) {
+          statusEl.textContent = data.error || 'Unable to check ticker.';
+          return;
+        }
+
+        const m = data.metrics;
+        verdictEl.textContent = `${data.ticker}: ${m.verdict} (${m.score}/${m.max_score})`;
+        verdictEl.style.color = m.verdict_color;
+        asofEl.textContent = `As of ${m.last_timestamp}`;
+
+        metricsEl.innerHTML = '';
+        metricsEl.appendChild(metricCard('Price', `$${m.price}`));
+        metricsEl.appendChild(metricCard('5D Change', `${m.change_5d_pct}%`));
+        metricsEl.appendChild(metricCard('20D Change', `${m.change_20d_pct}%`));
+        metricsEl.appendChild(metricCard('SMA 20', `$${m.sma20}`));
+        metricsEl.appendChild(metricCard('SMA 50', `$${m.sma50}`));
+        metricsEl.appendChild(metricCard('RSI 14', `${m.rsi14}`));
+        metricsEl.appendChild(metricCard('Volatility (20D ann.)', `${m.volatility_20d_annualized}`));
+        metricsEl.appendChild(metricCard('Volume vs 20D avg', `${m.volume_vs_20d}x`));
+
+        reasonsEl.innerHTML = '';
+        m.reasons.forEach((r) => {
+          const li = document.createElement('li');
+          li.textContent = r;
+          reasonsEl.appendChild(li);
+        });
+
+        resultEl.classList.remove('hidden');
+      } catch (err) {
+        statusEl.textContent = 'Network error while checking ticker.';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Check Ticker';
+      }
+    }
+
+    btn.addEventListener('click', runCheck);
+    tickerInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') runCheck();
+    });
+  </script>
+</body>
+</html>
