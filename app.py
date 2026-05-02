@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+import yfinance as yf
 from flask import Flask, jsonify, render_template, request
 
 APP_ROOT = Path(__file__).resolve().parent
@@ -32,6 +33,30 @@ def _load_symbol_bars(symbol: str) -> pd.DataFrame:
     if df.empty or "close" not in df.columns:
         raise ValueError(f"Cached data for {ticker} is invalid.")
     return df
+
+
+def _load_symbol_bars_yahoo(symbol: str) -> pd.DataFrame:
+    ticker = str(symbol or "").upper().strip()
+    if not ticker:
+        raise ValueError("Ticker is required.")
+    df = yf.download(
+        tickers=ticker,
+        period="1y",
+        interval="1d",
+        auto_adjust=False,
+        progress=False,
+        threads=False,
+    )
+    if df is None or df.empty:
+        raise ValueError(f"No Yahoo data returned for {ticker}.")
+    out = df.reset_index()
+    out.columns = [str(c).lower() for c in out.columns]
+    rename_map = {"date": "timestamp", "adj close": "adj_close"}
+    out = out.rename(columns=rename_map)
+    for col in ("open", "high", "low", "close", "volume"):
+        if col not in out.columns:
+            out[col] = pd.NA
+    return out
 
 
 def _compute_free_tier_metrics(df: pd.DataFrame) -> dict[str, Any]:
@@ -140,7 +165,11 @@ def free_check():
         return jsonify({"ok": False, "error": "Please enter a ticker."}), 400
 
     try:
-        bars = _load_symbol_bars(symbol)
+        # Prefer fresh Yahoo bars in production; fallback to local cache for resilience.
+        try:
+            bars = _load_symbol_bars_yahoo(symbol)
+        except Exception:
+            bars = _load_symbol_bars(symbol)
         metrics = _compute_free_tier_metrics(bars)
         return jsonify({"ok": True, "ticker": symbol, "metrics": metrics})
     except Exception as exc:
