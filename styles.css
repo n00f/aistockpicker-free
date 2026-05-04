@@ -65,6 +65,26 @@ button:disabled { opacity: 0.7; cursor: default; }
 
 .status { color: #fca5a5; min-height: 20px; }
 .hidden { display: none; }
+.logBox {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #071224;
+  padding: 8px;
+  margin-bottom: 12px;
+}
+.logHeader {
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.activityLog {
+  margin: 0;
+  max-height: 140px;
+  overflow: auto;
+  white-space: pre-wrap;
+  color: #cbd5e1;
+  font-size: 0.8rem;
+}
 
 .verdictRow {
   display: flex;

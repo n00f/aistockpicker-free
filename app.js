@@ -7,9 +7,25 @@ const asofEl = document.getElementById('asof');
 const metricsEl = document.getElementById('metrics');
 const reasonsEl = document.getElementById('reasons');
 const markersEl = document.getElementById('indicator-markers');
+const activityLogEl = document.getElementById('activity-log');
 
 let priceChart = null;
 let rsiChart = null;
+
+function nowStamp() {
+  return new Date().toLocaleTimeString();
+}
+
+function clearLog() {
+  if (!activityLogEl) return;
+  activityLogEl.textContent = '';
+}
+
+function logStep(message) {
+  if (!activityLogEl) return;
+  activityLogEl.textContent += `[${nowStamp()}] ${message}\n`;
+  activityLogEl.scrollTop = activityLogEl.scrollHeight;
+}
 
 function safeNum(v, d = 0) {
   const n = Number(v);
@@ -154,18 +170,23 @@ function parseYahooChart(json) {
 }
 
 async function tryFetchText(url) {
+  logStep(`Trying text source: ${url}`);
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  logStep(`Text source OK: ${url}`);
   return res.text();
 }
 
 async function tryFetchJson(url) {
+  logStep(`Trying JSON source: ${url}`);
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  logStep(`JSON source OK: ${url}`);
   return res.json();
 }
 
 async function fetchRowsWithFallback(ticker) {
+  logStep(`Starting data pull for ${ticker}`);
   const t = ticker.toLowerCase();
   const stooqSymbols = [
     `${t}.us`,
@@ -191,11 +212,16 @@ async function fetchRowsWithFallback(ticker) {
       try {
         rows = parseCsv(text);
       } catch (_) {
+        logStep('Strict CSV parse failed, trying lenient parser.');
         rows = parseCsvLenient(text);
       }
-      if (rows.length >= 60) return rows;
-    } catch (_) {
-      // Continue fallback chain.
+      if (rows.length >= 60) {
+        logStep(`Using text source with ${rows.length} rows.`);
+        return rows;
+      }
+      logStep(`Source returned only ${rows.length} rows; continuing.`);
+    } catch (err) {
+      logStep(`Text source failed: ${attempt} (${err?.message || 'unknown error'})`);
     }
   }
 
@@ -209,12 +235,17 @@ async function fetchRowsWithFallback(ticker) {
     try {
       const data = await tryFetchJson(attempt);
       const rows = parseYahooChart(data);
-      if (rows.length >= 60) return rows;
-    } catch (_) {
-      // Continue fallback chain.
+      if (rows.length >= 60) {
+        logStep(`Using JSON source with ${rows.length} rows.`);
+        return rows;
+      }
+      logStep(`JSON source returned only ${rows.length} rows; continuing.`);
+    } catch (err) {
+      logStep(`JSON source failed: ${attempt} (${err?.message || 'unknown error'})`);
     }
   }
 
+  logStep('All market data sources failed.');
   throw new Error('Could not fetch market data right now. Please try a different ticker or try again shortly.');
 }
 
@@ -353,18 +384,23 @@ async function runCheck() {
   const ticker = tickerInput.value.trim().toUpperCase();
   statusEl.textContent = '';
   resultEl.classList.add('hidden');
+  clearLog();
 
   if (!ticker) {
     statusEl.textContent = 'Please enter a ticker.';
+    logStep('Ticker input missing.');
     return;
   }
 
   btn.disabled = true;
   btn.textContent = 'Checking...';
+  logStep(`Requested ticker: ${ticker}`);
 
   try {
     const rows = await fetchRowsWithFallback(ticker);
+    logStep(`Computing indicators from ${rows.length} rows.`);
     const m = computeMetrics(rows);
+    logStep(`Analysis complete. Score=${m.score}/${m.maxScore}, verdict=${m.verdict}.`);
 
     verdictEl.textContent = `${ticker}: ${m.verdict} (${m.score}/${m.maxScore})`;
     verdictEl.style.color = m.verdictColor;
@@ -392,9 +428,11 @@ async function runCheck() {
     resultEl.classList.remove('hidden');
   } catch (err) {
     statusEl.textContent = err?.message || 'Unable to check ticker right now.';
+    logStep(`Final error: ${err?.message || 'Unable to check ticker right now.'}`);
   } finally {
     btn.disabled = false;
     btn.textContent = 'Check Ticker';
+    logStep('Request finished.');
   }
 }
 
