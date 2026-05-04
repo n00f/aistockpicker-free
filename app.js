@@ -139,7 +139,21 @@ function parseCsvLenient(text) {
   try {
     return parseCsv(lines.join('\n'));
   } catch (_) {
-    return [];
+    // Fallback for wrapped proxy responses (for example r.jina.ai) that embed CSV lines in extra text.
+    const extracted = [];
+    for (const line of lines) {
+      const m = line.match(/^(\d{4}-\d{2}-\d{2})\s*,\s*([-+0-9.eE]+)\s*,\s*([-+0-9.eE]+)\s*,\s*([-+0-9.eE]+)\s*,\s*([-+0-9.eE]+)\s*,\s*([-+0-9.eE]+)\s*$/);
+      if (!m) continue;
+      extracted.push({
+        date: m[1],
+        open: safeNum(m[2]),
+        high: safeNum(m[3]),
+        low: safeNum(m[4]),
+        close: safeNum(m[5]),
+        volume: safeNum(m[6]),
+      });
+    }
+    return extracted.filter((r) => r.close > 0);
   }
 }
 
